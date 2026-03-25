@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor de Concursos</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080a0f;
+  --bg2: #0e1117;
+  --bg3: #151a24;
+  --border: rgba(99,179,237,0.08);
+  --border2: rgba(99,179,237,0.18);
+  --blue: #63b3ed;
+  --blue-dim: #2a4a6b;
+  --green: #48bb78;
+  --green-dim: #1a3d2b;
+  --amber: #ecc94b;
+  --amber-dim: #4a3a10;
+  --red: #fc8181;
+  --red-dim: #4a1a1a;
+  --gray: #718096;
+  --text: #e2e8f0;
+  --text2: #a0aec0;
+  --text3: #4a5568;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --r: 8px;
+  --r-sm: 5px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; min-height: 100vh; }
+body::after {
+  content:''; position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none; z-index:999;
+}
+
+/* ── SETUP ── */
+#setup-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:2rem; }
+.setup-card { background:var(--bg2); border:1px solid var(--border2); border-radius:16px; padding:2.5rem; max-width:580px; width:100%; }
+.setup-logo { font-family:var(--mono); font-size:13px; color:var(--blue); margin-bottom:1.75rem; }
+.setup-title { font-size:22px; font-weight:600; color:var(--text); margin-bottom:8px; line-height:1.3; }
+.setup-sub { font-size:14px; color:var(--text2); line-height:1.6; margin-bottom:2rem; }
+
+.setup-step { display:flex; gap:14px; margin-bottom:1.5rem; align-items:flex-start; }
+.step-num { width:28px; height:28px; border-radius:50%; background:var(--blue-dim); border:1px solid var(--blue); color:var(--blue); font-family:var(--mono); font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+.step-body { flex:1; }
+.step-title { font-size:14px; font-weight:500; color:var(--text); margin-bottom:4px; }
+.step-desc { font-size:13px; color:var(--text2); line-height:1.6; }
+.step-link { color:var(--blue); text-decoration:none; }
+.step-link:hover { text-decoration:underline; }
+.step-code { font-family:var(--mono); color:var(--blue); background:rgba(99,179,237,0.08); padding:1px 6px; border-radius:4px; font-size:12px; }
+
+.key-input-wrap { position:relative; margin-top:10px; }
+.key-input { width:100%; background:var(--bg3); border:1px solid var(--border2); border-radius:var(--r); color:var(--text); font-family:var(--mono); font-size:13px; padding:12px 48px 12px 14px; outline:none; transition:border-color 0.15s; }
+.key-input:focus { border-color:var(--blue); }
+.key-input::placeholder { color:var(--text3); font-family:var(--sans); font-size:13px; }
+.key-toggle { position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); cursor:pointer; font-size:16px; padding:4px; }
+.key-toggle:hover { color:var(--text2); }
+.key-hint { font-size:12px; color:var(--text3); margin-top:6px; line-height:1.5; }
+
+.save-btn { width:100%; margin-top:1.5rem; background:var(--blue-dim); border:1px solid var(--blue); border-radius:var(--r); color:var(--blue); font-family:var(--mono); font-size:14px; font-weight:500; padding:13px; cursor:pointer; transition:all 0.15s; }
+.save-btn:hover { background:var(--blue); color:var(--bg); }
+.setup-error { background:rgba(252,129,129,0.08); border:1px solid var(--red-dim); border-radius:var(--r-sm); padding:10px 14px; font-size:13px; color:var(--red); margin-top:10px; display:none; line-height:1.5; }
+.setup-error.show { display:block; }
+.free-note { background:rgba(72,187,120,0.06); border:1px solid var(--green-dim); border-radius:var(--r-sm); padding:12px 14px; margin-top:1.5rem; font-size:12px; color:var(--green); line-height:1.6; }
+
+/* ── MAIN ── */
+#main-app { display:none; }
+.app { max-width:1100px; margin:0 auto; padding:1.5rem 1.25rem 4rem; }
+
+.topbar { display:flex; align-items:center; justify-content:space-between; padding-bottom:1rem; margin-bottom:1.5rem; border-bottom:1px solid var(--border); }
+.logo { font-family:var(--mono); font-size:15px; color:var(--blue); }
+.logo-dim { color:var(--text3); }
+.topbar-right { display:flex; align-items:center; gap:10px; }
+.status-dot { width:7px; height:7px; border-radius:50%; background:var(--text3); }
+.status-dot.pulse { animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.status-text { font-family:var(--mono); font-size:11px; color:var(--text3); }
+.last-update { font-family:var(--mono); font-size:11px; color:var(--text3); }
+.change-key-btn { background:none; border:1px solid var(--border2); border-radius:var(--r-sm); color:var(--text3); font-family:var(--mono); font-size:10px; padding:4px 10px; cursor:pointer; transition:all 0.15s; }
+.change-key-btn:hover { border-color:var(--blue); color:var(--blue); }
+
+.stats-row { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:1.25rem; }
+.stat-box { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:12px 14px; }
+.stat-lbl { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.1em; font-family:var(--mono); margin-bottom:5px; }
+.stat-val { font-family:var(--mono); font-size:22px; color:var(--text); }
+.stat-val.green { color:var(--green); }
+.stat-val.amber { color:var(--amber); }
+.stat-val.blue  { color:var(--blue); }
+
+.controls { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:1rem 1.25rem; margin-bottom:1.25rem; display:flex; flex-direction:column; gap:12px; }
+.controls-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+.ctrl-group { display:flex; flex-direction:column; gap:5px; }
+.ctrl-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.08em; font-family:var(--mono); }
+select, input[type="text"] { background:var(--bg3); border:1px solid var(--border2); border-radius:var(--r-sm); color:var(--text); font-family:var(--sans); font-size:12px; padding:7px 10px; outline:none; cursor:pointer; transition:border-color 0.15s; }
+select:hover, input[type="text"]:hover { border-color:var(--blue); }
+select:focus, input[type="text"]:focus { border-color:var(--blue); }
+input[type="text"] { width:200px; }
+input[type="text"]::placeholder { color:var(--text3); }
+.fetch-btn { background:var(--blue-dim); border:1px solid var(--blue); border-radius:var(--r-sm); color:var(--blue); font-family:var(--mono); font-size:12px; padding:8px 18px; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+.fetch-btn:hover { background:var(--blue); color:var(--bg); }
+.fetch-btn:disabled { opacity:0.4; cursor:not-allowed; }
+.clear-btn { background:transparent; border:1px solid var(--border2); border-radius:var(--r-sm); color:var(--text3); font-family:var(--mono); font-size:11px; padding:8px 14px; cursor:pointer; transition:all 0.15s; }
+.clear-btn:hover { border-color:var(--red); color:var(--red); }
+
+.progress-wrap { display:none; margin-bottom:1rem; }
+.progress-wrap.show { display:block; }
+.progress-bar-bg { background:var(--bg3); border-radius:3px; height:3px; overflow:hidden; margin-bottom:6px; }
+.progress-bar-fill { height:100%; background:var(--blue); width:0%; transition:width 0.4s ease; border-radius:3px; }
+.progress-msg { font-family:var(--mono); font-size:11px; color:var(--blue); }
+
+.error-box { background:rgba(252,129,129,0.06); border:1px solid var(--red-dim); border-radius:var(--r); padding:14px; margin-bottom:1.25rem; font-size:12px; color:var(--red); display:none; line-height:1.6; }
+.error-box.show { display:block; }
+
+.notice { background:var(--bg2); border:1px solid var(--amber-dim); border-radius:var(--r); padding:10px 14px; margin-bottom:1.25rem; font-size:12px; color:var(--amber); line-height:1.6; display:flex; gap:10px; }
+
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+thead th { background:var(--bg3); padding:8px 12px; font-size:10px; font-family:var(--mono); text-transform:uppercase; letter-spacing:0.08em; color:var(--text3); text-align:left; border-bottom:1px solid var(--border2); white-space:nowrap; cursor:pointer; user-select:none; }
+thead th:hover { color:var(--blue); }
+tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
+tbody tr:hover { background:var(--bg2); }
+tbody td { padding:10px 12px; vertical-align:middle; }
+.empty-row td { text-align:center; padding:3rem; color:var(--text3); font-family:var(--mono); font-size:12px; }
+
+.pill { display:inline-block; font-size:10px; font-family:var(--mono); padding:2px 8px; border-radius:20px; white-space:nowrap; }
+.pill-open  { background:rgba(72,187,120,0.12); color:var(--green); border:1px solid var(--green-dim); }
+.pill-soon  { background:rgba(236,201,75,0.12);  color:var(--amber); border:1px solid var(--amber-dim); }
+.pill-prev  { background:rgba(113,128,150,0.12); color:var(--gray);  border:1px solid var(--border2); }
+.pill-fed   { background:rgba(99,179,237,0.1);   color:var(--blue);  border:1px solid var(--blue-dim); }
+.pill-est   { background:rgba(72,187,120,0.08);  color:#68d391;      border:1px solid #1a4a2b; }
+.pill-medio { background:rgba(236,201,75,0.08);  color:var(--amber); border:1px solid var(--amber-dim); }
+.pill-sup   { background:rgba(99,179,237,0.08);  color:var(--blue);  border:1px solid var(--blue-dim); }
+.pill-any   { background:rgba(159,122,234,0.1);  color:#b794f4;      border:1px solid #44337a; }
+.pill-comm  { background:rgba(252,129,129,0.1);  color:var(--red);   border:1px solid var(--red-dim); }
+
+.org-name  { font-size:13px; font-weight:500; color:var(--text); }
+.org-cargo { font-size:11px; color:var(--text2); margin-top:2px; }
+.salario-val { font-family:var(--mono); font-size:12px; color:var(--green); }
+.vagas-val   { font-family:var(--mono); font-size:12px; }
+.nivel-cell  { display:flex; flex-direction:column; gap:3px; }
+.links-cell  { display:flex; flex-direction:column; gap:4px; }
+.link-btn { display:inline-block; font-family:var(--mono); font-size:10px; padding:3px 8px; border-radius:var(--r-sm); border:1px solid var(--border2); color:var(--blue); text-decoration:none; white-space:nowrap; transition:all 0.12s; }
+.link-btn:hover { background:var(--blue-dim); border-color:var(--blue); }
+.link-btn.inscricao { border-color:var(--green-dim); color:var(--green); }
+.link-btn.inscricao:hover { background:var(--green-dim); }
+
+.footer { margin-top:2rem; padding-top:1rem; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.footer-left  { font-family:var(--mono); font-size:10px; color:var(--text3); }
+.footer-right { font-size:11px; color:var(--text3); }
+
+@media(max-width:700px){
+  .stats-row { grid-template-columns:repeat(3,1fr); }
+  .controls-row { flex-direction:column; align-items:stretch; }
+  input[type="text"] { width:100%; }
+  .topbar { flex-direction:column; gap:10px; align-items:flex-start; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ TELA DE CONFIGURAÇÃO ══════════════ -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">[ MONITOR DE CONCURSOS ]</div>
+    <div class="setup-title">Bem-vinda! Configure em<br>3 passos rápidos — e de graça.</div>
+    <div class="setup-sub">Este painel usa a IA do Google (Gemini) para buscar concursos em tempo real. A chave de acesso é totalmente gratuita, basta ter uma conta Google.</div>
+
+    <div class="setup-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Acesse o Google AI Studio</div>
+        <div class="step-desc">
+          Abra uma nova aba e acesse <a class="step-link" href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Faça login com sua conta Google (a mesma do Gmail). É gratuito.
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Crie sua chave de API</div>
+        <div class="step-desc">
+          Clique no botão azul <strong style="color:var(--text)">Create API key</strong>. Selecione qualquer projeto (ou crie um novo). A chave será gerada na hora — começa com <span class="step-code">AIza</span>.
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Cole a chave aqui embaixo</div>
+        <div class="step-desc">Copie a chave gerada e cole no campo abaixo. Pronto — só precisa fazer isso uma vez.</div>
+        <div class="key-input-wrap">
+          <input class="key-input" type="password" id="api-key-input"
+            placeholder="Cole aqui sua chave (AIza...)" autocomplete="off" />
+          <button class="key-toggle" onclick="toggleKeyVis()" title="Mostrar/ocultar">👁</button>
+        </div>
+        <div class="key-hint">Sua chave fica salva <strong style="color:var(--text2)">somente no seu navegador</strong>, nunca em outro servidor.</div>
+        <div class="setup-error" id="setup-error"></div>
+      </div>
+    </div>
+
+    <button class="save-btn" onclick="saveKey()">Salvar e entrar no painel →</button>
+
+    <div class="free-note">
+      ✓ <strong>100% gratuito:</strong> o Gemini oferece uma camada gratuita generosa (até 1.500 buscas por dia). Sem precisar colocar cartão de crédito.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAINEL PRINCIPAL ══════════════ -->
+<div id="main-app">
+<div class="app">
+
+  <div class="topbar">
+    <div class="logo"><span class="logo-dim">[</span> MONITOR CONCURSOS <span class="logo-dim">]</span></div>
+    <div class="topbar-right">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-text" id="status-text">aguardando busca</span>
+      <span class="last-update" id="last-update"></span>
+      <button class="change-key-btn" onclick="changeKey()">trocar chave</button>
+    </div>
+  </div>
+
+  <div class="notice">
+    <span style="flex-shrink:0">⚠</span>
+    <span>Dados gerados por IA — podem conter imprecisões. Confirme prazos e links nos sites oficiais antes de se inscrever.</span>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-lbl">total</div><div class="stat-val" id="st-total">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">abertos</div><div class="stat-val green" id="st-open">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">em breve</div><div class="stat-val amber" id="st-soon">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">nível médio</div><div class="stat-val blue" id="st-medio">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">nível superior</div><div class="stat-val" id="st-sup">—</div></div>
+  </div>
+
+  <div class="controls">
+    <div class="controls-row">
+      <div class="ctrl-group">
+        <div class="ctrl-label">Status do edital</div>
+        <select id="f-status">
+          <option value="">Todos</option>
+          <option value="aberto">Aberto</option>
+          <option value="previsto_curto">Em breve</option>
+          <option value="previsto_sem_prazo">Previsto</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Âmbito</div>
+        <select id="f-ambito">
+          <option value="">Federal + Estadual/Municipal</option>
+          <option value="federal">Somente Federal</option>
+          <option value="estadual">Somente Estadual/Municipal</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">UF / Região</div>
+        <select id="f-uf">
+          <option value="RJ">Rio de Janeiro (RJ)</option>
+          <option value="SP">São Paulo (SP)</option>
+          <option value="MG">Minas Gerais (MG)</option>
+          <option value="todos">Todos os estados</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Nível de escolaridade</div>
+        <select id="f-nivel">
+          <option value="">Médio e Superior</option>
+          <option value="medio">Somente Nível Médio</option>
+          <option value="superior">Somente Nível Superior</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Área (nível superior)</div>
+        <select id="f-area">
+          <option value="">Qualquer área</option>
+          <option value="qualquer_graduacao">Aceita qualquer graduação</option>
+          <option value="comunicacao">Comunicação Social</option>
+        </select>
+      </div>
+    </div>
+    <div class="controls-row">
+      <div class="ctrl-group">
+        <div class="ctrl-label">Salário mínimo</div>
+        <select id="f-salario">
+          <option value="0">Qualquer</option>
+          <option value="5000">R$ 5.000+</option>
+          <option value="7000">R$ 7.000+</option>
+          <option value="9000" selected>R$ 9.000+</option>
+          <option value="12000">R$ 12.000+</option>
+          <option value="15000">R$ 15.000+</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Busca livre</div>
+        <input type="text" id="f-search" placeholder="ex: INSS, tribunais, saúde..." />
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="fetch-btn" id="fetch-btn" onclick="fetchConcursos()">↓ Buscar concursos agora</button>
+        <button class="clear-btn" onclick="clearData()">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-bar"></div></div>
+    <div class="progress-msg" id="prog-msg">Consultando IA...</div>
+  </div>
+
+  <div class="error-box" id="error-box"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('org')">Órgão / Cargo ↕</th>
+          <th onclick="sortBy('status')">Status ↕</th>
+          <th onclick="sortBy('ambito')">Âmbito / UF ↕</th>
+          <th onclick="sortBy('salario_num')">Salário inicial ↕</th>
+          <th onclick="sortBy('vagas_num')">Vagas ↕</th>
+          <th>Nível</th>
+          <th>Área (sup.)</th>
+          <th>Links e prazo</th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <tr class="empty-row"><td colspan="8">Configure os filtros acima e clique em "Buscar concursos agora"</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">monitor-concursos · powered by google gemini</div>
+    <div class="footer-right">Verifique sempre nos sites oficiais</div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const CACHE_KEY  = 'monitor_gemini_v1_cache';
+const APIKEY_KEY = 'monitor_gemini_v1_apikey';
+let allData = [], sortKey = '', sortDir = 1, apiKey = '';
+
+/* ── SETUP ── */
+function init() {
+  const saved = localStorage.getItem(APIKEY_KEY);
+  if (saved) { apiKey = saved; showApp(); }
+}
+
+function toggleKeyVis() {
+  const inp = document.getElementById('api-key-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function saveKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  const err = document.getElementById('setup-error');
+  if (val.length < 20) {
+    err.textContent = 'Chave inválida. Verifique se copiou corretamente do Google AI Studio.';
+    err.classList.add('show'); return;
+  }
+  err.classList.remove('show');
+  apiKey = val;
+  localStorage.setItem(APIKEY_KEY, val);
+  showApp();
+}
+
+function showApp() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  const cache = loadCache();
+  if (cache) {
+    allData = cache.data;
+    const mins = Math.round((Date.now() - cache.ts) / 60000);
+    document.getElementById('last-update').textContent = '· cache de ' + mins + 'min atrás';
+    setStatus('dados em cache', 'var(--amber)');
+    renderTable(applyFilters(allData));
+  }
+  bindFilters();
+}
+
+function changeKey() {
+  localStorage.removeItem(APIKEY_KEY);
+  localStorage.removeItem(CACHE_KEY);
+  apiKey = ''; allData = [];
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+}
+
+/* ── CACHE ── */
+function saveCache(data) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() })); } catch(e) {}
+}
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return (Date.now() - obj.ts < 8 * 60 * 60 * 1000) ? obj : null;
+  } catch(e) { return null; }
+}
+
+/* ── UI HELPERS ── */
+function setStatus(msg, color) {
+  const dot = document.getElementById('status-dot');
+  dot.style.background = color || 'var(--green)';
+  dot.className = 'status-dot' + (color === 'var(--amber)' || color === 'var(--green)' ? ' pulse' : '');
+  document.getElementById('status-text').textContent = msg;
+}
+function setProgress(pct, msg) {
+  document.getElementById('prog-bar').style.width = pct + '%';
+  document.getElementById('prog-msg').textContent = msg;
+}
+function showError(msg) {
+  const el = document.getElementById('error-box');
+  el.innerHTML = '⚠ ' + msg;
+  el.classList.add('show');
+}
+function hideError() { document.getElementById('error-box').classList.remove('show'); }
+
+/* ── FILTERS ── */
+function getFilters() {
+  return {
+    status:  document.getElementById('f-status').value,
+    ambito:  document.getElementById('f-ambito').value,
+    uf:      document.getElementById('f-uf').value,
+    nivel:   document.getElementById('f-nivel').value,
+    area:    document.getElementById('f-area').value,
+    salario: parseInt(document.getElementById('f-salario').value) || 0,
+    search:  document.getElementById('f-search').value.trim().toLowerCase()
+  };
+}
+function bindFilters() {
+  ['f-status','f-ambito','f-uf','f-nivel','f-area','f-salario'].forEach(id =>
+    document.getElementById(id).addEventListener('change', () => {
+      if (allData.length) renderTable(applyFilters(allData));
+    })
+  );
+  document.getElementById('f-search').addEventListener('input', () => {
+    if (allData.length) renderTable(applyFilters(allData));
+  });
+}
+function applyFilters(data) {
+  const f = getFilters();
+  return data.filter(c => {
+    if (f.status && c.status !== f.status) return false;
+    if (f.ambito === 'federal' && c.ambito !== 'federal') return false;
+    if (f.ambito === 'estadual' && c.ambito === 'federal') return false;
+    if (f.uf && f.uf !== 'todos') {
+      if (c.ambito === 'federal' && !c.vaga_rj) return false;
+      if (c.ambito !== 'federal' && c.uf !== f.uf) return false;
+    }
+    if (f.nivel === 'medio' && !c.nivel_medio) return false;
+    if (f.nivel === 'superior' && !c.nivel_superior) return false;
+    if (f.area === 'qualquer_graduacao' && !c.area_qualquer) return false;
+    if (f.area === 'comunicacao' && !c.area_comunicacao) return false;
+    if (f.salario > 0 && c.salario_num > 0 && c.salario_num < f.salario) return false;
+    if (f.search) {
+      if (!(c.org + ' ' + c.cargo + ' ' + (c.obs||'')).toLowerCase().includes(f.search)) return false;
+    }
+    return true;
+  });
+}
+
+/* ── PROMPT ── */
+function buildPrompt(f) {
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  let filtros = '';
+  if (f.status === 'aberto')              filtros += '- Apenas editais com inscrições abertas agora\n';
+  if (f.status === 'previsto_curto')      filtros += '- Apenas editais previstos para os próximos 3 meses\n';
+  if (f.status === 'previsto_sem_prazo')  filtros += '- Apenas editais previstos sem data definida\n';
+  if (f.ambito === 'federal')             filtros += '- Apenas concursos federais\n';
+  if (f.ambito === 'estadual')            filtros += '- Apenas concursos estaduais ou municipais\n';
+  if (f.uf && f.uf !== 'todos')           filtros += `- Foco no estado ${f.uf}. Se federal, incluir só se tiver vagas para ${f.uf}\n`;
+  if (f.nivel === 'medio')                filtros += '- Apenas com vagas para nível médio\n';
+  if (f.nivel === 'superior')             filtros += '- Apenas com vagas para nível superior\n';
+  if (f.area === 'qualquer_graduacao')    filtros += '- Nível superior que aceite qualquer graduação\n';
+  if (f.area === 'comunicacao')           filtros += '- Nível superior que aceite Comunicação Social\n';
+  if (f.salario > 0)                      filtros += `- Salário inicial acima de R$ ${f.salario.toLocaleString('pt-BR')}\n`;
+  if (f.search)                           filtros += `- Relacionado a: ${f.search}\n`;
+  if (!filtros)                           filtros = '- Todos os concursos mais relevantes do Brasil\n';
+
+  return `Você é especialista em concursos públicos brasileiros. Data de hoje: ${hoje}.
+
+Liste concursos públicos com edital aberto, autorizado ou previsto. Filtros:
+${filtros}
+IMPORTANTE: retorne SOMENTE um array JSON válido, sem markdown, sem texto antes ou depois.
+
+Estrutura de cada objeto:
+{"org":"Nome do órgão","cargo":"Cargos principais","status":"aberto|previsto_curto|previsto_sem_prazo","ambito":"federal|estadual|municipal","uf":"sigla ex: RJ ou Nacional","vaga_rj":true,"salario":"R$ X.XXX,XX ou a definir","salario_num":9000,"vagas":"30 ou a definir","vagas_num":30,"nivel_medio":true,"nivel_superior":true,"area_qualquer":true,"area_comunicacao":false,"link_edital":"https://...","link_inscricao":"https://...","prazo_inscricao":"DD/MM/AAAA ou a definir","banca":"nome ou a definir","obs":"observação curta"}
+
+Retorne pelo menos 15 concursos reais. Não invente dados nem URLs.`;
+}
+
+/* ── FETCH ── */
+async function fetchConcursos() {
+  const btn = document.getElementById('fetch-btn');
+  const pw  = document.getElementById('progress-wrap');
+  btn.disabled = true;
+  hideError();
+  pw.classList.add('show');
+  setStatus('buscando...', 'var(--amber)');
+  setProgress(10, 'Conectando ao Gemini...');
+
+  const f = getFilters();
+
+  try {
+    setProgress(30, 'Enviando consulta...');
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: buildPrompt(f) }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 8192,
+            responseMimeType: 'application/json'
+          }
+        })
+      }
+    );
+
+    setProgress(70, 'Processando resposta...');
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = err?.error?.message || '';
+      if (res.status === 400 && msg.includes('API_KEY')) throw new Error('Chave de API inválida. Clique em "trocar chave" e verifique a chave no Google AI Studio.');
+      if (res.status === 429) throw new Error('Limite de uso atingido. Aguarde alguns minutos e tente novamente.');
+      throw new Error(msg || `Erro HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw  = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    setProgress(90, 'Organizando dados...');
+
+    let parsed;
+    try {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const s = clean.indexOf('['), e = clean.lastIndexOf(']');
+      parsed = JSON.parse(s >= 0 && e >= 0 ? clean.slice(s, e + 1) : clean);
+      if (!Array.isArray(parsed)) throw new Error();
+    } catch {
+      throw new Error('Não foi possível interpretar a resposta. Tente novamente.');
+    }
+
+    allData = parsed;
+    saveCache(allData);
+    setProgress(100, 'Concluído!');
+    setTimeout(() => pw.classList.remove('show'), 1000);
+
+    document.getElementById('last-update').textContent =
+      '· atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+    setStatus('dados atualizados', 'var(--green)');
+    renderTable(applyFilters(allData));
+
+  } catch(err) {
+    pw.classList.remove('show');
+    setStatus('erro', 'var(--red)');
+    showError(err.message || 'Erro desconhecido. Tente novamente.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ── SORT ── */
+function sortBy(key) {
+  if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = 1; }
+  renderTable([...applyFilters(allData)].sort((a, b) => {
+    const va = a[key] ?? '', vb = b[key] ?? '';
+    return (typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))) * sortDir;
+  }));
+}
+
+/* ── RENDER ── */
+function statusPill(s) {
+  const m = { aberto:['pill-open','Aberto'], previsto_curto:['pill-soon','Em breve'], previsto_sem_prazo:['pill-prev','Previsto'] };
+  const [cls, lbl] = m[s] || ['pill-prev', s];
+  return `<span class="pill ${cls}">${lbl}</span>`;
+}
+function ambitoPill(c) {
+  if (c.ambito === 'federal') {
+    const rj = c.vaga_rj
+      ? `<div style="font-size:10px;color:var(--amber);margin-top:3px">✓ vaga p/ RJ</div>`
+      : `<div style="font-size:10px;color:var(--text3);margin-top:3px">sem vaga RJ</div>`;
+    return `<span class="pill pill-fed">Federal</span>${rj}`;
+  }
+  return `<span class="pill pill-est">${c.ambito === 'municipal' ? 'Municipal' : 'Estadual'} · ${c.uf}</span>`;
+}
+function nivelCell(c) {
+  let h = '<div class="nivel-cell">';
+  if (c.nivel_medio)    h += `<span class="pill pill-medio">Médio</span>`;
+  if (c.nivel_superior) h += `<span class="pill pill-sup">Superior</span>`;
+  return h + '</div>';
+}
+function areaCell(c) {
+  if (!c.nivel_superior) return '<span style="color:var(--text3)">—</span>';
+  let h = '<div class="nivel-cell">';
+  if (c.area_qualquer)    h += `<span class="pill pill-any">Qualquer grad.</span>`;
+  if (c.area_comunicacao) h += `<span class="pill pill-comm">Comunicação</span>`;
+  if (!c.area_qualquer && !c.area_comunicacao) h += `<span style="color:var(--text3);font-size:11px">específica</span>`;
+  return h + '</div>';
+}
+function linksCell(c) {
+  let h = '<div class="links-cell">';
+  if (c.link_edital)    h += `<a class="link-btn" href="${c.link_edital}" target="_blank" rel="noopener">Edital ↗</a>`;
+  if (c.link_inscricao) h += `<a class="link-btn inscricao" href="${c.link_inscricao}" target="_blank" rel="noopener">Inscrição ↗</a>`;
+  if (c.prazo_inscricao && c.prazo_inscricao !== 'a definir')
+    h += `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">até ${c.prazo_inscricao}</span>`;
+  if (!c.link_edital && !c.link_inscricao)
+    h += `<span style="color:var(--text3);font-size:11px">a divulgar</span>`;
+  return h + '</div>';
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('table-body');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Nenhum concurso encontrado com os filtros selecionados</td></tr>';
+    updateStats([]); return;
+  }
+  tbody.innerHTML = data.map(c => `<tr>
+    <td>
+      <div class="org-name">${c.org}</div>
+      <div class="org-cargo">${c.cargo}</div>
+      ${c.banca && c.banca !== 'a definir' ? `<div style="font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--mono)">${c.banca}</div>` : ''}
+    </td>
+    <td>${statusPill(c.status)}</td>
+    <td>${ambitoPill(c)}</td>
+    <td><div class="salario-val">${c.salario || 'a definir'}</div></td>
+    <td><div class="vagas-val">${c.vagas || '?'}</div></td>
+    <td>${nivelCell(c)}</td>
+    <td>${areaCell(c)}</td>
+    <td>${linksCell(c)}</td>
+  </tr>`).join('');
+  updateStats(data);
+}
+
+function updateStats(data) {
+  document.getElementById('st-total').textContent = data.length || '—';
+  document.getElementById('st-open').textContent  = data.filter(c => c.status === 'aberto').length || '—';
+  document.getElementById('st-soon').textContent  = data.filter(c => c.status === 'previsto_curto').length || '—';
+  document.getElementById('st-medio').textContent = data.filter(c => c.nivel_medio).length || '—';
+  document.getElementById('st-sup').textContent   = data.filter(c => c.nivel_superior).length || '—';
+}
+
+function clearData() {
+  allData = [];
+  localStorage.removeItem(CACHE_KEY);
+  renderTable([]);
+  setStatus('aguardando busca', 'var(--text3)');
+  document.getElementById('status-dot').style.background = 'var(--text3)';
+  document.getElementById('last-update').textContent = '';
+}
+
+init();
+</script>
+</body>
+</html>
